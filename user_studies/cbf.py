@@ -22,9 +22,9 @@ def get_to_predict(user, surprise_dataset):
 
     # find items user has not seen, and randomly sample 50 unseen items
     items_unseen_by_user = list(all_items - items_seen_by_user)
-    unseen_sample = random.sample(items_unseen_by_user, 50)
+    # unseen_sample = random.sample(items_unseen_by_user, 50)
 
-    return items_seen_by_user, unseen_sample
+    return items_seen_by_user, items_unseen_by_user
 
 def item_similarity(item_to_recommend, user_profile_items, similarity_df, n):
     """Calculates the similarity between an item to be recommended and the user profile items,
