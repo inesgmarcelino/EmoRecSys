@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import numpy as np
 import random
@@ -70,6 +71,14 @@ def item_similarity(item_to_recommend, user_profile_items, similarity_df, n):
 
     return item_ids[:n]
 
+def process_item(item_test, items_seen_by_user, user_interactions_df, similarity_df, n):
+    item_train_sim = item_similarity(item_test, items_seen_by_user, similarity_df, n)
+    item_train_sim_df = user_interactions_df[user_interactions_df['iid'].isin(item_train_sim)]
+    ratings = item_train_sim_df['rating'].tolist()
+    mean_value = np.mean(ratings) if ratings else 0
+
+    return (item_test, mean_value)
+
 def recommend_items_from_cbf(user, surprise_dataset, similarity_df, n=5):
     """
     This function compares the items that the user already saw and classified with the items that the user saw to generate personalized recommendations.
@@ -96,12 +105,18 @@ def recommend_items_from_cbf(user, surprise_dataset, similarity_df, n=5):
     # print(user_interactions_df)
     
     items_to_recommend = []
-    for item_test in unseen_sample:
-        item_train_sim = item_similarity(item_test, items_seen_by_user, similarity_df, n)
-        item_train_sim_df = user_interactions_df[user_interactions_df['iid'].isin(item_train_sim)]
-        ratings = item_train_sim_df['rating'].tolist()
-        mean_value = np.mean(ratings)
-        items_to_recommend.append((item_test, mean_value))
+    with ThreadPoolExecutor() as executor:
+        results = executor.map(
+            process_item, 
+            unseen_sample, 
+            [items_seen_by_user] * len(unseen_sample), 
+            [user_interactions_df] * len(unseen_sample), 
+            [similarity_df] * len(unseen_sample), 
+            [n] * len(unseen_sample)
+        )
+        items_to_recommend = list(results)
+
+    items_to_recommend = [(item, mean_value) for item, mean_value in items_to_recommend if mean_value > 0]
 
     items_to_recommend_ids = [item for item, _ in items_to_recommend]
     if len(items_to_recommend_ids) < 10:
@@ -109,12 +124,16 @@ def recommend_items_from_cbf(user, surprise_dataset, similarity_df, n=5):
         num_to_add = 10 - len(items_to_recommend_ids)
         random_items = random.sample(available_items, num_to_add)
 
-        for item_random in random_items:
-            item_random_sim = item_similarity(item_random, items_seen_by_user, similarity_df, n)
-            item_random_sim_df = user_interactions_df[user_interactions_df['iid'].isin(item_random_sim)]
-            ratings_random = item_random_sim_df['rating'].tolist()
-            mean_value_random = np.mean(ratings_random) 
-            items_to_recommend.append((item_random, mean_value_random))
+        with ThreadPoolExecutor() as executor:
+            random_results = executor.map(
+                process_item,
+                random_items,
+                [items_seen_by_user] * len(random_items), 
+                [user_interactions_df] * len(random_items), 
+                [similarity_df] * len(random_items), 
+                [n] * len(random_items)
+            )
+            items_to_recommend.extend(list(random_results))
 
     # Sort the items by their evaluation and return the ids
     items_to_recommend.sort(key=lambda x: x[1], reverse=True)
