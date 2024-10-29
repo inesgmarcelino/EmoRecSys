@@ -1,8 +1,8 @@
 # ----- IMPORTS ----- #
 from cbf import recommend_items_from_cbf
-from user_studies.data import get_ratings
 from cf import recommend_items_from_cf
 from surprise import Reader, Dataset
+from data import data # this file contains confidential info so its not in the repository
 import pandas as pd
 import subprocess
 import random
@@ -59,16 +59,18 @@ def user_studies_recommendation(dataset, user_test, test_type):
 if __name__ == "__main__":
     start_time = time.time()
 
-    user_test = int(sys.argv[1])
-    rec_type = int(sys.argv[2])
+    rec_type = int(sys.argv[1])
 
-    dataset = get_ratings()
+    ratings, surveys = data()
     reader = Reader(rating_scale=(0,1)) # like_bool
-    new_dataset = Dataset.load_from_df(dataset[['id_survey', 'id_photo', 'like_bool']], reader).build_full_trainset()
+    new_dataset = Dataset.load_from_df(ratings[['id_survey', 'id_photo', 'like_bool']], reader).build_full_trainset()
     
-    print(f'Hi user {user_test}!')
+    # user_test = input("Qual o seu user id? ")
+
+    user_test = surveys['id'].iloc[-1]
+    print(f'\nHi user {user_test}!')
     user_studies_recommendation(new_dataset, user_test, rec_type)
 
     execution_time = time.time() - start_time
 
-    print(f'Execution Time: {execution_time // 60}:{execution_time % 60} minutes')
+    print(f'(Execution Time: {int(execution_time // 60)} minutes and {int(execution_time % 60)} seconds)')
